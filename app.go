@@ -13,16 +13,19 @@ type App struct {
 	Server      Server
 }
 
+var (
+	tStatus = reflect.TypeOf(HttpStatus(200))
+)
+
 func (a *App) routeController(c Controller) error {
 	cType := reflect.TypeOf(c)
 	cValue := reflect.ValueOf(c)
 
 	cName := cType.Name()
 	cMethods := cType.NumMethod()
-
 	cRoot := strings.ToLower(GetWords(cName)[0])
 
-	logger.Debug("[CONTROLLER]", cName, cMethods)
+	logger.Info("[CONTROLLER]", cName, cMethods)
 	for i := 0; i < cMethods; i++ {
 		m := cType.Method(i)
 		mName := m.Name
@@ -42,13 +45,28 @@ func (a *App) routeController(c Controller) error {
 
 		path := sb.String()
 
+		logger.Infof("[ROUTE] %s %s", method, path)
+
+		statusOutIdx := -1
+
+		for outIdx := 1; outIdx < m.Type.NumOut(); outIdx++ {
+			out := m.Type.Out(outIdx)
+			if out.AssignableTo(tStatus) {
+				statusOutIdx = outIdx
+				break
+			}
+		}
+
 		callable := cValue.Method(i)
 
-		logger.Debugf("[ROUTE] %s %s", method, path)
 		a.Route(HttpMethod(method), path, func(req Request) Response {
 			out := callable.Call([]reflect.Value{})
+			status := StatusOK
+			if statusOutIdx != -1 {
+				status = out[statusOutIdx].Interface().(HttpStatus)
+			}
 			return Response{
-				StatusCode: 200,
+				StatusCode: status,
 				Data:       out[0].Interface(),
 			}
 		})

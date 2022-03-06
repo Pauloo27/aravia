@@ -9,9 +9,9 @@ import (
 type UserController struct {
 }
 
-func (UserController) Post() string {
+func (UserController) Post() (string, aravia.HttpStatus) {
 	logger.Success("called =)")
-	return "post =)"
+	return "post =)", 418
 }
 
 func (UserController) Get() string {
