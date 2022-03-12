@@ -10,8 +10,8 @@ type UserController struct {
 }
 
 type User struct {
-	Name  string
-	Email string
+	Name  string `json:"name" validate:"required"`
+	Email string `json:"e-mail" validate:"required,email"`
 }
 
 type UserBodyInput User

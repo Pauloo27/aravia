@@ -91,6 +91,16 @@ func (a *App) routeController(c Controller) error {
 						StatusCode: StatusUnprocessableEntity,
 					}
 				}
+				errs := Validate(body)
+				if len(errs) != 0 {
+					return Response{
+						Data: fiber.Map{
+							"error": "validation error",
+							"more":  errs,
+						},
+						StatusCode: StatusBadRequest,
+					}
+				}
 				params = append(params,
 					reflect.ValueOf(body).Elem(),
 				)
