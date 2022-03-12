@@ -1,11 +1,14 @@
 package aravia
 
 import (
+	"encoding/json"
 	"errors"
 	"reflect"
+	"regexp"
 	"strings"
 
 	"github.com/Pauloo27/logger"
+	"github.com/gofiber/fiber/v2"
 )
 
 type App struct {
@@ -14,8 +17,29 @@ type App struct {
 }
 
 var (
-	tStatus = reflect.TypeOf(HttpStatus(200))
+	tStatus     = reflect.TypeOf(HttpStatus(200))
+	reBodyInput = regexp.MustCompile(`^\w+BodyInput$`)
 )
+
+func findByNameRe(num int, f func(i int) reflect.Type, re *regexp.Regexp) int {
+	for i := 1; i < num; i++ {
+		out := f(i)
+		if re.MatchString(out.Name()) {
+			return i
+		}
+	}
+	return -1
+}
+
+func findType(num int, f func(i int) reflect.Type, targetType reflect.Type) int {
+	for i := 1; i < num; i++ {
+		out := f(i)
+		if out.AssignableTo(targetType) {
+			return i
+		}
+	}
+	return -1
+}
 
 func (a *App) routeController(c Controller) error {
 	cType := reflect.TypeOf(c)
@@ -45,22 +69,34 @@ func (a *App) routeController(c Controller) error {
 
 		path := sb.String()
 
-		logger.Infof("[ROUTE] %s %s", method, path)
+		logger.Info("[ROUTE]", method, path)
 
-		statusOutIdx := -1
+		statusOutIdx := findType(m.Type.NumOut(), m.Type.Out, tStatus)
 
-		for outIdx := 1; outIdx < m.Type.NumOut(); outIdx++ {
-			out := m.Type.Out(outIdx)
-			if out.AssignableTo(tStatus) {
-				statusOutIdx = outIdx
-				break
-			}
-		}
+		bodyInIdx := findByNameRe(m.Type.NumIn(), m.Type.In, reBodyInput)
 
 		callable := cValue.Method(i)
 
 		a.Route(HttpMethod(method), path, func(req Request) Response {
-			out := callable.Call([]reflect.Value{})
+			var params []reflect.Value
+			if bodyInIdx != -1 {
+				bodyIn := m.Type.In(bodyInIdx)
+				body := reflect.New(bodyIn).Interface()
+				err := json.Unmarshal(req.Body, body)
+				if err != nil {
+					return Response{
+						Data: fiber.Map{
+							"error": "invalid body input",
+						},
+						StatusCode: StatusUnprocessableEntity,
+					}
+				}
+				params = append(params,
+					reflect.ValueOf(body).Elem(),
+				)
+			}
+
+			out := callable.Call(params)
 			status := StatusOK
 			if statusOutIdx != -1 {
 				status = out[statusOutIdx].Interface().(HttpStatus)

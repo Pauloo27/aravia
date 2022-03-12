@@ -9,8 +9,15 @@ import (
 type UserController struct {
 }
 
-func (UserController) Post() (string, aravia.HttpStatus) {
-	logger.Success("called =)")
+type User struct {
+	Name  string
+	Email string
+}
+
+type UserBodyInput User
+
+func (UserController) Post(body UserBodyInput) (string, aravia.HttpStatus) {
+	logger.Success("called =)", body)
 	return "post =)", 418
 }
 
