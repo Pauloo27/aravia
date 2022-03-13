@@ -25,6 +25,7 @@ func (s FiberServer) Route(method aravia.HttpMethod, path string, handler aravia
 			Body:    ctx.Body(),
 			Headers: ctx.GetReqHeaders(),
 			Path:    ctx.Path(),
+			Method:  aravia.HttpMethod(ctx.Method()),
 		})
 		return ctx.Status(int(response.StatusCode)).JSON(response.Data)
 	})
