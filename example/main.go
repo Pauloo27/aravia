@@ -14,6 +14,11 @@ type User struct {
 	Email string `json:"e-mail" validate:"required,email"`
 }
 
+type FilterQueryInput struct {
+	Type  string `json:"type" validate:"required"`
+	Email string `json:"e-mail,omitempty" validate:"omitempty,email"`
+}
+
 type UserBodyInput User
 
 func (UserController) Init() *aravia.ControllerInfo {
@@ -27,7 +32,8 @@ func (UserController) Post(body UserBodyInput) (string, aravia.HttpStatus) {
 	return "post =)", 418
 }
 
-func (UserController) Get() string {
+func (UserController) Get(filters FilterQueryInput) string {
+	logger.Success("filters", filters)
 	return "get =)"
 }
 

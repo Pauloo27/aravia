@@ -17,9 +17,10 @@ type App struct {
 }
 
 var (
-	tStatus     = reflect.TypeOf(HttpStatus(200))
-	tRequest    = reflect.TypeOf(Request{})
-	reBodyInput = regexp.MustCompile(`^\w+BodyInput$`)
+	tStatus      = reflect.TypeOf(HttpStatus(200))
+	tRequest     = reflect.TypeOf(Request{})
+	reBodyInput  = regexp.MustCompile(`^\w+BodyInput$`)
+	reQueryInput = regexp.MustCompile(`^\w+QueryInput$`)
 )
 
 type InputType string
@@ -27,6 +28,7 @@ type InputType string
 const (
 	InputBody    = InputType("body")
 	InputRequest = InputType("request")
+	InputQuery   = InputType("query")
 	InputInvalid = InputType("")
 )
 
@@ -40,6 +42,10 @@ func listInputs(method reflect.Method) []InputType {
 		in := method.Type.In(i + 1)
 		if reBodyInput.MatchString(in.Name()) {
 			inputs[i] = InputBody
+			continue
+		}
+		if reQueryInput.MatchString(in.Name()) {
+			inputs[i] = InputQuery
 			continue
 		}
 		if in.AssignableTo(tRequest) {
@@ -69,6 +75,27 @@ func findType(num int, f func(i int) reflect.Type, targetType reflect.Type) int 
 		}
 	}
 	return -1
+}
+
+func parseAndValidate(tInput reflect.Type, data []byte) (interface{}, error) {
+	input := reflect.New(tInput).Interface()
+	err := json.Unmarshal(data, input)
+	if err != nil {
+		return nil, HttpError{
+			StatusCode: StatusUnprocessableEntity,
+			Message:    err.Error(),
+			Data:       Map{"error": err.Error()},
+		}
+	}
+	errs := Validate(input)
+	if len(errs) != 0 {
+		return nil, HttpError{
+			StatusCode: StatusBadRequest,
+			Message:    "validation error",
+			Data:       Map{"error": "validation error", "more": errs},
+		}
+	}
+	return input, nil
 }
 
 func (a *App) routeController(c Controller) error {
@@ -125,26 +152,25 @@ func (a *App) routeController(c Controller) error {
 				switch in {
 				case InputRequest:
 					params[i] = reflect.ValueOf(req)
-				case InputBody:
-					bodyIn := m.Type.In(i + 1)
-					body := reflect.New(bodyIn).Interface()
-					err := json.Unmarshal(req.Body, body)
+				case InputQuery:
+					// im really sorry mom
+					encodedQuery, _ := json.Marshal(req.Query)
+					query, err := parseAndValidate(m.Type.In(i+1), encodedQuery)
 					if err != nil {
+						httpError := err.(HttpError)
 						return Response{
-							Data: Map{
-								"error": "invalid body input",
-							},
-							StatusCode: StatusUnprocessableEntity,
+							StatusCode: httpError.StatusCode,
+							Data:       httpError.Data,
 						}
 					}
-					errs := Validate(body)
-					if len(errs) != 0 {
+					params[i] = reflect.ValueOf(query).Elem()
+				case InputBody:
+					body, err := parseAndValidate(m.Type.In(i+1), req.Body)
+					if err != nil {
+						httpError := err.(HttpError)
 						return Response{
-							Data: Map{
-								"error": "validation error",
-								"more":  errs,
-							},
-							StatusCode: StatusBadRequest,
+							StatusCode: httpError.StatusCode,
+							Data:       httpError.Data,
 						}
 					}
 					params[i] = reflect.ValueOf(body).Elem()

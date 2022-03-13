@@ -6,4 +6,5 @@ type Request struct {
 	Headers map[string]string
 	Path    string
 	Params  map[string]string
+	Query   map[string]string
 }

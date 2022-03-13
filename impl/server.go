@@ -22,15 +22,21 @@ func (s FiberServer) Listen(bindAddr string) error {
 func (s FiberServer) Route(method aravia.HttpMethod, path string, handler aravia.Handler) {
 	s.app.Add(string(method), path, func(ctx *fiber.Ctx) error {
 		var params = make(map[string]string)
+		var query = make(map[string]string)
 		for _, param := range ctx.Route().Params {
 			params[param] = ctx.Params(param)
 		}
+		ctx.Context().QueryArgs().VisitAll(func(key, value []byte) {
+			query[string(key)] = string(value)
+		})
+
 		response := handler(aravia.Request{
 			Body:    ctx.Body(),
 			Headers: ctx.GetReqHeaders(),
 			Path:    ctx.Path(),
 			Method:  aravia.HttpMethod(ctx.Method()),
 			Params:  params,
+			Query:   query,
 		})
 		return ctx.Status(int(response.StatusCode)).JSON(response.Data)
 	})
