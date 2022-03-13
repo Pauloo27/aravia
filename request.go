@@ -1,5 +1,7 @@
 package aravia
 
 type Request struct {
-	Body []byte
+	Body    []byte
+	Headers map[string]string
+	Path    string
 }

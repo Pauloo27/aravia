@@ -8,10 +8,10 @@ import (
 	"strings"
 
 	"github.com/Pauloo27/logger"
-	"github.com/gofiber/fiber/v2"
 )
 
 type App struct {
+	Middlewares []Middleware
 	Controllers []Controller
 	Server      Server
 }
@@ -85,7 +85,7 @@ func (a *App) routeController(c Controller) error {
 				err := json.Unmarshal(req.Body, body)
 				if err != nil {
 					return Response{
-						Data: fiber.Map{
+						Data: Map{
 							"error": "invalid body input",
 						},
 						StatusCode: StatusUnprocessableEntity,
@@ -94,7 +94,7 @@ func (a *App) routeController(c Controller) error {
 				errs := Validate(body)
 				if len(errs) != 0 {
 					return Response{
-						Data: fiber.Map{
+						Data: Map{
 							"error": "validation error",
 							"more":  errs,
 						},
@@ -104,6 +104,13 @@ func (a *App) routeController(c Controller) error {
 				params = append(params,
 					reflect.ValueOf(body).Elem(),
 				)
+			}
+
+			for _, middleware := range a.Middlewares {
+				res := middleware.Run(req)
+				if res != nil {
+					return *res
+				}
 			}
 
 			out := callable.Call(params)
@@ -129,8 +136,12 @@ func (a *App) routeControllers() error {
 	return nil
 }
 
-func (a *App) RegisterController(controller Controller) {
+func (a *App) With(controller Controller) {
 	a.Controllers = append(a.Controllers, controller)
+}
+
+func (a *App) Use(middleware Middleware) {
+	a.Middlewares = append(a.Middlewares, middleware)
 }
 
 func (a *App) Listen(bindAddr string) error {

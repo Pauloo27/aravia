@@ -22,7 +22,9 @@ func (s FiberServer) Listen(bindAddr string) error {
 func (s FiberServer) Route(method aravia.HttpMethod, path string, handler aravia.Handler) {
 	s.app.Add(string(method), path, func(ctx *fiber.Ctx) error {
 		response := handler(aravia.Request{
-			Body: ctx.Body(),
+			Body:    ctx.Body(),
+			Headers: ctx.GetReqHeaders(),
+			Path:    ctx.Path(),
 		})
 		return ctx.Status(int(response.StatusCode)).JSON(response.Data)
 	})

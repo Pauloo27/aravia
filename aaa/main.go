@@ -29,10 +29,27 @@ func (UserController) GetName() string {
 	return "get name =)"
 }
 
+type AuthMiddleware struct {
+}
+
+func (AuthMiddleware) Run(req aravia.Request) (res *aravia.Response) {
+	logger.Debug("[MIDDLEWARE] ", req.Path)
+	if _, found := req.Headers["Authorization"]; found {
+		return nil
+	}
+	return &aravia.Response{
+		StatusCode: aravia.StatusUnauthorized,
+		Data: aravia.Map{
+			"error": "missing Authorization header",
+		},
+	}
+}
+
 func main() {
 	app := aravia.App{
 		Server: impl.NewFiberServer(),
 	}
-	app.RegisterController(UserController{})
+	app.Use(AuthMiddleware{})
+	app.With(UserController{})
 	app.Listen(":8023")
 }
