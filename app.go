@@ -108,8 +108,16 @@ func (a *App) routeController(c Controller) error {
 			Path: strings.ToLower(GetWords(cType.Name())[0]),
 		}
 	}
+	info.Path = strings.Trim(info.Path, "/")
 
 	cMethods := cType.NumMethod()
+
+	routeByHandlerName := make(map[string]string)
+	routeMethodByHandlerName := make(map[string]HttpMethod)
+	for route, routeInfo := range info.Routes {
+		routeByHandlerName[routeInfo.HandlerName] = route
+		routeMethodByHandlerName[routeInfo.HandlerName] = routeInfo.Method
+	}
 
 	logger.Info("[CONTROLLER]", info.Path, cMethods)
 	for i := 0; i < cMethods; i++ {
@@ -119,24 +127,36 @@ func (a *App) routeController(c Controller) error {
 		if mName == "Init" || !m.IsExported() {
 			continue
 		}
-		words := GetWords(mName)
-		if len(words) == 0 {
-			return errors.New("invalid handler name")
-		}
-		method := strings.ToUpper(words[0])
-		sb := strings.Builder{}
-		sb.WriteString("/")
-		sb.WriteString(info.Path)
 
-		for _, word := range words[1:] {
-			if strings.HasPrefix(word, "_") {
-				word = ":" + word[1:]
+		var (
+			path   string
+			method HttpMethod
+		)
+
+		mappedPath, found := routeByHandlerName[mName]
+		method = routeMethodByHandlerName[mName]
+
+		path = "/" + info.Path
+		if found {
+			path = path + "/" + strings.Trim(mappedPath, "/")
+		} else {
+			words := GetWords(mName)
+			if len(words) == 0 {
+				return errors.New("invalid handler name")
 			}
-			sb.WriteString("/")
-			sb.WriteString(strings.ToLower(word))
-		}
+			method = HttpMethod(strings.ToUpper(words[0]))
+			sb := strings.Builder{}
+			sb.WriteString(path)
 
-		path := sb.String()
+			for _, word := range words[1:] {
+				if strings.HasPrefix(word, "_") {
+					word = ":" + word[1:]
+				}
+				sb.WriteString("/")
+				sb.WriteString(strings.ToLower(word))
+			}
+			path = sb.String()
+		}
 
 		logger.Info("[ROUTE]", method, path)
 

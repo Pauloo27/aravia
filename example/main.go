@@ -21,9 +21,15 @@ type FilterQueryInput struct {
 
 type UserBodyInput User
 
-func (UserController) Init() *aravia.ControllerInfo {
+func (c UserController) Init() *aravia.ControllerInfo {
 	return &aravia.ControllerInfo{
 		Path: "users",
+		Routes: map[string]aravia.RouteInfo{
+			":id": {
+				Method:      "Get",
+				HandlerName: "GetById",
+			},
+		},
 	}
 }
 
@@ -37,7 +43,7 @@ func (UserController) Get(filters FilterQueryInput) string {
 	return "get =)"
 }
 
-func (UserController) Get_Id(req aravia.Request) string {
+func (UserController) GetById(req aravia.Request) string {
 	return "get by id " + req.Params["id"]
 }
 

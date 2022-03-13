@@ -1,8 +1,8 @@
 package aravia
 
 type RouteInfo struct {
-	Path   string
-	Method HttpMethod
+	Method      HttpMethod
+	HandlerName string
 }
 
 type ControllerInfo struct {
