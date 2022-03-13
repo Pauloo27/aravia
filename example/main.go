@@ -16,6 +16,12 @@ type User struct {
 
 type UserBodyInput User
 
+func (UserController) Init() *aravia.ControllerInfo {
+	return &aravia.ControllerInfo{
+		Path: "users",
+	}
+}
+
 func (UserController) Post(body UserBodyInput) (string, aravia.HttpStatus) {
 	logger.Success("called =)", body)
 	return "post =)", 418
@@ -25,8 +31,8 @@ func (UserController) Get() string {
 	return "get =)"
 }
 
-func (UserController) GetName() string {
-	return "get name =)"
+func (UserController) Get_Id(req aravia.Request) string {
+	return "get by id " + req.Params["id"]
 }
 
 type AuthMiddleware struct {

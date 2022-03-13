@@ -18,13 +18,43 @@ type App struct {
 
 var (
 	tStatus     = reflect.TypeOf(HttpStatus(200))
+	tRequest    = reflect.TypeOf(Request{})
 	reBodyInput = regexp.MustCompile(`^\w+BodyInput$`)
 )
 
+type InputType string
+
+const (
+	InputBody    = InputType("body")
+	InputRequest = InputType("request")
+	InputInvalid = InputType("")
+)
+
+func listInputs(method reflect.Method) []InputType {
+	inCount := method.Type.NumIn() - 1
+	if inCount == 0 {
+		return nil
+	}
+	var inputs = make([]InputType, inCount)
+	for i := 0; i < inCount; i++ {
+		in := method.Type.In(i + 1)
+		if reBodyInput.MatchString(in.Name()) {
+			inputs[i] = InputBody
+			continue
+		}
+		if in.AssignableTo(tRequest) {
+			inputs[i] = InputRequest
+			continue
+		}
+		logger.Fatal("invalid handler input type", in.Name())
+	}
+	return inputs
+}
+
 func findByNameRe(num int, f func(i int) reflect.Type, re *regexp.Regexp) int {
 	for i := 1; i < num; i++ {
-		out := f(i)
-		if re.MatchString(out.Name()) {
+		item := f(i)
+		if re.MatchString(item.Name()) {
 			return i
 		}
 	}
@@ -33,8 +63,8 @@ func findByNameRe(num int, f func(i int) reflect.Type, re *regexp.Regexp) int {
 
 func findType(num int, f func(i int) reflect.Type, targetType reflect.Type) int {
 	for i := 1; i < num; i++ {
-		out := f(i)
-		if out.AssignableTo(targetType) {
+		item := f(i)
+		if item.AssignableTo(targetType) {
 			return i
 		}
 	}
@@ -45,14 +75,23 @@ func (a *App) routeController(c Controller) error {
 	cType := reflect.TypeOf(c)
 	cValue := reflect.ValueOf(c)
 
-	cName := cType.Name()
-	cMethods := cType.NumMethod()
-	cRoot := strings.ToLower(GetWords(cName)[0])
+	info := c.Init()
+	if info == nil {
+		info = &ControllerInfo{
+			Path: strings.ToLower(GetWords(cType.Name())[0]),
+		}
+	}
 
-	logger.Info("[CONTROLLER]", cName, cMethods)
+	cMethods := cType.NumMethod()
+
+	logger.Info("[CONTROLLER]", info.Path, cMethods)
 	for i := 0; i < cMethods; i++ {
 		m := cType.Method(i)
 		mName := m.Name
+		// skip specials or private functions
+		if mName == "Init" || !m.IsExported() {
+			continue
+		}
 		words := GetWords(mName)
 		if len(words) == 0 {
 			return errors.New("invalid handler name")
@@ -60,9 +99,12 @@ func (a *App) routeController(c Controller) error {
 		method := strings.ToUpper(words[0])
 		sb := strings.Builder{}
 		sb.WriteString("/")
-		sb.WriteString(cRoot)
+		sb.WriteString(info.Path)
 
 		for _, word := range words[1:] {
+			if strings.HasPrefix(word, "_") {
+				word = ":" + word[1:]
+			}
 			sb.WriteString("/")
 			sb.WriteString(strings.ToLower(word))
 		}
@@ -73,37 +115,40 @@ func (a *App) routeController(c Controller) error {
 
 		statusOutIdx := findType(m.Type.NumOut(), m.Type.Out, tStatus)
 
-		bodyInIdx := findByNameRe(m.Type.NumIn(), m.Type.In, reBodyInput)
+		inputs := listInputs(m)
 
 		callable := cValue.Method(i)
 
 		a.Route(HttpMethod(method), path, func(req Request) Response {
-			var params []reflect.Value
-			if bodyInIdx != -1 {
-				bodyIn := m.Type.In(bodyInIdx)
-				body := reflect.New(bodyIn).Interface()
-				err := json.Unmarshal(req.Body, body)
-				if err != nil {
-					return Response{
-						Data: Map{
-							"error": "invalid body input",
-						},
-						StatusCode: StatusUnprocessableEntity,
+			var params = make([]reflect.Value, len(inputs))
+			for i, in := range inputs {
+				switch in {
+				case InputRequest:
+					params[i] = reflect.ValueOf(req)
+				case InputBody:
+					bodyIn := m.Type.In(i + 1)
+					body := reflect.New(bodyIn).Interface()
+					err := json.Unmarshal(req.Body, body)
+					if err != nil {
+						return Response{
+							Data: Map{
+								"error": "invalid body input",
+							},
+							StatusCode: StatusUnprocessableEntity,
+						}
 					}
-				}
-				errs := Validate(body)
-				if len(errs) != 0 {
-					return Response{
-						Data: Map{
-							"error": "validation error",
-							"more":  errs,
-						},
-						StatusCode: StatusBadRequest,
+					errs := Validate(body)
+					if len(errs) != 0 {
+						return Response{
+							Data: Map{
+								"error": "validation error",
+								"more":  errs,
+							},
+							StatusCode: StatusBadRequest,
+						}
 					}
+					params[i] = reflect.ValueOf(body).Elem()
 				}
-				params = append(params,
-					reflect.ValueOf(body).Elem(),
-				)
 			}
 
 			for _, middleware := range a.Middlewares {
