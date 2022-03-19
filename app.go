@@ -68,7 +68,7 @@ func findByNameRe(num int, f func(i int) reflect.Type, re *regexp.Regexp) int {
 }
 
 func findType(num int, f func(i int) reflect.Type, targetType reflect.Type) int {
-	for i := 1; i < num; i++ {
+	for i := 0; i < num; i++ {
 		item := f(i)
 		if item.AssignableTo(targetType) {
 			return i
@@ -161,8 +161,11 @@ func (a *App) routeController(c Controller) error {
 		logger.Info("[ROUTE]", method, path)
 
 		statusOutIdx := findType(m.Type.NumOut(), m.Type.Out, tStatus)
+		logger.Debug("idx", statusOutIdx)
 
 		inputs := listInputs(m)
+
+		outLen := m.Type.NumOut()
 
 		callable := cValue.Method(i)
 
@@ -206,12 +209,21 @@ func (a *App) routeController(c Controller) error {
 
 			out := callable.Call(params)
 			status := StatusOK
+			var data interface{}
+
+			if outLen == 0 || statusOutIdx == 0 {
+				status = StatusNoContent
+				data = nil
+			} else {
+				data = out[0].Interface()
+			}
+
 			if statusOutIdx != -1 {
 				status = out[statusOutIdx].Interface().(HttpStatus)
 			}
 			return Response{
 				StatusCode: status,
-				Data:       out[0].Interface(),
+				Data:       data,
 			}
 		})
 	}

@@ -38,6 +38,14 @@ func (UserController) Post(body UserBodyInput) (string, aravia.HttpStatus) {
 	return "post =)", 418
 }
 
+func (UserController) Delete() {
+	logger.Info("delete was called =)")
+}
+
+func (UserController) DeleteTest() aravia.HttpStatus {
+	return aravia.StatusRequestEntityTooLarge
+}
+
 func (UserController) Get(filters FilterQueryInput) string {
 	logger.Success("filters", filters)
 	return "get =)"

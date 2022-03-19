@@ -38,6 +38,9 @@ func (s FiberServer) Route(method aravia.HttpMethod, path string, handler aravia
 			Params:  params,
 			Query:   query,
 		})
+		if response.Data == nil {
+			return ctx.Status(int(response.StatusCode)).Send([]byte{})
+		}
 		return ctx.Status(int(response.StatusCode)).JSON(response.Data)
 	})
 }
