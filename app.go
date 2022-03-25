@@ -161,7 +161,6 @@ func (a *App) routeController(c Controller) error {
 		logger.Info("[ROUTE]", method, path)
 
 		statusOutIdx := findType(m.Type.NumOut(), m.Type.Out, tStatus)
-		logger.Debug("idx", statusOutIdx)
 
 		inputs := listInputs(m)
 
@@ -239,8 +238,10 @@ func (a *App) routeControllers() error {
 	return nil
 }
 
-func (a *App) With(controller Controller) {
-	a.Controllers = append(a.Controllers, controller)
+func (a *App) With(controllers ...Controller) {
+	for _, controller := range controllers {
+		a.Controllers = append(a.Controllers, controller)
+	}
 }
 
 func (a *App) Use(middleware Middleware) {
