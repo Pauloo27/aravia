@@ -9,9 +9,9 @@ type FiberServer struct {
 	Fiber *fiber.App
 }
 
-func NewFiberServer() FiberServer {
+func NewFiberServer(server *fiber.App) FiberServer {
 	return FiberServer{
-		Fiber: fiber.New(),
+		Fiber: server,
 	}
 }
 
