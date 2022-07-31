@@ -6,21 +6,21 @@ import (
 )
 
 type FiberServer struct {
-	app *fiber.App
+	Fiber *fiber.App
 }
 
 func NewFiberServer() FiberServer {
 	return FiberServer{
-		app: fiber.New(),
+		Fiber: fiber.New(),
 	}
 }
 
 func (s FiberServer) Listen(bindAddr string) error {
-	return s.app.Listen(bindAddr)
+	return s.Fiber.Listen(bindAddr)
 }
 
 func (s FiberServer) Route(method aravia.HttpMethod, path string, handler aravia.Handler) {
-	s.app.Add(string(method), path, func(ctx *fiber.Ctx) error {
+	s.Fiber.Add(string(method), path, func(ctx *fiber.Ctx) error {
 		var params = make(map[string]string)
 		var query = make(map[string]string)
 		for _, param := range ctx.Route().Params {
